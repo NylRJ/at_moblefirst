@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
-import { TextField, Button, Checkbox, FormControlLabel } from '@material-ui/core';
+import React, { useState, useEffect } from 'react';
+import { TextField, Button, Checkbox, FormControlLabel } from '@mui/material';
 import { db } from '../firebase/firebaseConfig';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { useParams, useNavigate } from 'react-router-dom';
 
-const EmpresaForm = ({ empresaId, onSubmit }) => {
+const EmpresaForm = ({ onSubmit }) => {
+    const { id } = useParams();
+    const navigate = useNavigate();
     const [empresa, setEmpresa] = useState({
         nome: '',
         cnpj: '',
@@ -17,6 +22,18 @@ const EmpresaForm = ({ empresaId, onSubmit }) => {
             email: ''
         }
     });
+
+    useEffect(() => {
+        if (id) {
+            const fetchEmpresa = async () => {
+                const empresaDoc = await getDoc(doc(db, 'empresas', id));
+                if (empresaDoc.exists()) {
+                    setEmpresa(empresaDoc.data());
+                }
+            };
+            fetchEmpresa();
+        }
+    }, [id]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -47,13 +64,17 @@ const EmpresaForm = ({ empresaId, onSubmit }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            if (empresaId) {
-                await updateDoc(doc(db, "empresas", empresaId), empresa);
+            if (id) {
+                await updateDoc(doc(db, "empresas", id), empresa);
+                toast.success('Empresa atualizada com sucesso!');
             } else {
                 await addDoc(collection(db, "empresas"), empresa);
+                toast.success('Empresa salva com sucesso!');
             }
             onSubmit(empresa);
+            navigate('/listagem-empresas'); // Redireciona para a página de listagem de empresas
         } catch (e) {
+            toast.error('Erro ao salvar empresa!');
             console.error("Erro ao adicionar/atualizar empresa: ", e);
         }
     };

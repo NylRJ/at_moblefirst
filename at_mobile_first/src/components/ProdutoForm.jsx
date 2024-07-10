@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { TextField, Button } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { db } from '../firebase/firebaseConfig';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, getDoc, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const ProdutoForm = ({ onSubmit }) => {
+    const { id } = useParams();
+    const navigate = useNavigate();
     const [produto, setProduto] = useState({
         nome: '',
         descricao: '',
@@ -35,6 +40,21 @@ const ProdutoForm = ({ onSubmit }) => {
         fetchEmpresas();
         fetchCategorias();
     }, []);
+
+    useEffect(() => {
+        if (id) {
+            const fetchProduto = async () => {
+                const produtoDoc = await getDoc(doc(db, 'produtos', id));
+                if (produtoDoc.exists()) {
+                    const produtoData = produtoDoc.data();
+                    setProduto(produtoData);
+                    setSelectedEmpresa(produtoData.empresas[0]);
+                    setSelectedCategoria(produtoData.categoria);
+                }
+            };
+            fetchProduto();
+        }
+    }, [id]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -75,10 +95,31 @@ const ProdutoForm = ({ onSubmit }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await addDoc(collection(db, "produtos"), produto);
-            onSubmit(produto);
+            if (!selectedCategoria || !selectedCategoria.id) {
+                toast.error('Por favor, selecione uma categoria válida.');
+                return;
+            }
+
+            const updatedProduto = {
+                ...produto,
+                categoria: {
+                    id: selectedCategoria.id,
+                    nome: selectedCategoria.nome
+                }
+            };
+
+            if (id) {
+                await updateDoc(doc(db, "produtos", id), updatedProduto);
+                toast.success('Produto atualizado com sucesso!');
+            } else {
+                await addDoc(collection(db, "produtos"), updatedProduto);
+                toast.success('Produto salvo com sucesso!');
+            }
+            onSubmit(updatedProduto);
+            navigate('/listagem-produtos'); // Redireciona para a página de listagem de produtos
         } catch (e) {
-            console.error("Erro ao adicionar produto: ", e);
+            toast.error('Erro ao salvar produto!');
+            console.error("Erro ao adicionar/atualizar produto: ", e);
         }
     };
 
@@ -92,6 +133,7 @@ const ProdutoForm = ({ onSubmit }) => {
                 options={categorias}
                 getOptionLabel={(option) => option.nome}
                 onChange={handleCategoriaChange}
+                value={selectedCategoria}
                 renderInput={(params) => <TextField {...params} label="Selecione a Categoria" variant="outlined" />}
                 fullWidth
             />
@@ -99,6 +141,7 @@ const ProdutoForm = ({ onSubmit }) => {
                 options={empresas}
                 getOptionLabel={(option) => option.nome}
                 onChange={handleEmpresaChange}
+                value={selectedEmpresa}
                 renderInput={(params) => <TextField {...params} label="Selecione a Empresa" variant="outlined" />}
                 fullWidth
             />
